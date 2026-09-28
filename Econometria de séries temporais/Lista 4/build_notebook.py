@@ -419,8 +419,10 @@ y_true = y[R:]
 
 fig, ax = plt.subplots()
 ax.plot(dates_test, y_true, label="IPCA observado", color="black", lw=1.4)
-ax.plot(dates_test, f_model, label="Previsto — ARIMA(1,0,0), janela móvel", color="tab:red", lw=1.2)
-ax.plot(dates_test, f_rw, label="Previsto — passeio aleatório", color="tab:orange", lw=1.2, ls="--")
+ax.plot(dates_test, f_model, label="Previsto — ARIMA(1,0,0), janela móvel", color="tab:red", lw=1.2,
+        ls="--", marker="s", ms=5, markevery=(0, 6))
+ax.plot(dates_test, f_rw, label="Previsto — passeio aleatório", color="tab:orange", lw=1.2,
+        ls=":", marker="^", ms=5, markevery=(3, 6))
 ax.set_title("IPCA: valores observados vs. previsões fora da amostra (P = 85 meses)")
 ax.set_ylabel("% a.m.")
 ax.legend()
@@ -534,10 +536,13 @@ y_target_sim = y_sim[R_sim:]
 t_eval = t_idx[R_sim:]
 
 fig, ax = plt.subplots()
-ax.plot(t_eval, y_target_sim, label="$y_t$ observado", color="black", lw=1.6, marker="o", ms=3)
-ax.plot(t_eval, f_true_sim, label="Previsto — coeficientes verdadeiros", color="tab:green", lw=1.2)
-ax.plot(t_eval, f_ar_sim, label="Previsto — AR(1) estimado (recursivo)", color="tab:red", lw=1.2)
-ax.plot(t_eval, f_rw_sim, label="Previsto — passeio aleatório", color="tab:orange", lw=1.2, ls="--")
+ax.plot(t_eval, y_target_sim, label="$y_t$ observado", color="black", lw=1.6, marker="o", ms=4, markevery=1)
+ax.plot(t_eval, f_true_sim, label="Previsto — coeficientes verdadeiros", color="tab:green", lw=1.2,
+        ls="-.", marker="D", ms=5, markevery=(0, 5))
+ax.plot(t_eval, f_ar_sim, label="Previsto — AR(1) estimado (recursivo)", color="tab:red", lw=1.2,
+        ls="--", marker="s", ms=5, markevery=(2, 5))
+ax.plot(t_eval, f_rw_sim, label="Previsto — passeio aleatório", color="tab:orange", lw=1.2,
+        ls=":", marker="^", ms=5, markevery=(4, 5))
 ax.set_title("Simulação: valores observados vs. previsões recursivas fora da amostra (t = 51..100)")
 ax.set_xlabel("t")
 ax.legend()
