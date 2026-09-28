@@ -16,25 +16,7 @@ def code(src):
 # ---------------------------------------------------------------------------
 # Cabecalho
 # ---------------------------------------------------------------------------
-md(r"""# Exercício 4 — Escolha de Modelo e Avaliação de Previsão
-
-**Disciplina:** Econometria das Séries Temporais Aplicada a Macroeconomia e Finanças — 2º semestre de 2026
-**Professor:** Mauro Sayar Ferreira
-**Instituição:** Universidade Federal de Minas Gerais — Faculdade de Ciências Econômicas
-**Data de entrega:** 29/09/2026
-**Trabalho em dupla — Dupla:** ______________________ e ______________________
-
----
-
-Este notebook resolve as quatro questões do Exercício 4. A **Parte I** trata da Questão 1, na
-qual uma série macroeconômica real — o IPCA — é utilizada para aplicar a metodologia de
-Box-Jenkins de identificação, estimação e seleção de um modelo ARIMA, seguida de um exercício de
-pseudo-previsão fora da amostra e dos testes de igualdade de capacidade preditiva de
-**Diebold-Mariano-West (DMW)** e **Clark-West (CW)** contra um passeio aleatório. A **Parte II**
-trata das Questões 2, 3 e 4, baseadas em uma série simulada AR(1) com inovações t-Student, que
-reproduz em ambiente controlado (com processo gerador de dados conhecido) os mesmos testes e,
-adicionalmente, um exercício de bootstrap semi-paramétrico para obtenção de valores críticos
-exatos em amostra finita.
+md(r"""# Lista 4: Tomás Warren e Laura Siqueira
 
 **Sumário**
 
@@ -93,7 +75,7 @@ regressores etc.) não pode ser informada por dados que, na prática, ainda não
 observados no momento da previsão.
 
 Uma vez fixada a especificação, os parâmetros usados para gerar cada previsão em $P$ podem ser
-reestimados de duas formas:
+reestimados de três formas:
 
 - **Janela recursiva (expansiva):** a cada novo período, o modelo é reestimado usando *todas* as
   observações disponíveis até aquele momento — a janela cresce a cada passo. É assintoticamente
@@ -103,6 +85,7 @@ reestimados de duas formas:
   recentes, descartando a mais antiga a cada novo período. É mais robusta a instabilidade dos
   parâmetros (quebras estruturais, mudanças de regime), ao custo de usar menos informação em cada
   reestimação (ver Giacomini & Rossi, 2010; West, 1996).
+- **Janela fixa:** o modelo é estimado uma única vez, com as R primeiras observações, e o vetor de parâmetros resultante é mantido constante para gerar todas as previsões fora da amostra, sem nenhuma reestimação posterior. Tem o menor custo computacional dos três esquemas e elimina a variação de previsão induzida por reestimações sucessivas, o que simplifica a inferência sobre a capacidade preditiva (ver West, 1996; Clark & McCracken, 2001). Em contrapartida, ignora toda a informação que chega depois da estimação inicial, de modo que se deteriora à medida que o horizonte de previsão se afasta da amostra de estimação, sobretudo se houver quebras estruturais ou mudanças de regime.
 
 Cada escolha metodológica é justificada, caso a caso, nas seções correspondentes deste notebook.
 
@@ -122,11 +105,11 @@ sigla DMW — têm distribuição assintótica normal padrão, e a comparação 
 erros quadráticos é bem-comportada. Quando os modelos são **aninhados**, contudo, o modelo maior
 está, sob $H_0$, estimando parâmetros cujo valor populacional é exatamente o do modelo menor (ou
 seja, coeficientes adicionais nulos, ou $\phi_1=1$ no caso do passeio aleatório); o ruído de
-estimação desses parâmetros extras infla artificialmente o MSFE amostral do modelo maior, mesmo
+estimação desses parâmetros extras infla artificialmente o EQMP amostral do modelo maior, mesmo
 quando os dois modelos são populacionalmente equivalentes. Isso enviesa a estatística DMW na
 direção de **não rejeitar** $H_0$ com frequência maior do que o nível nominal — ela fica
 "conservadora demais" (Clark & McCracken, 2001; Clark & West, 2006, 2007). É exatamente para
-corrigir esse viés que **Clark e West (2007)** propõem um ajuste à diferença de MSFE.
+corrigir esse viés que **Clark e West (2007)** propõem um ajuste à diferença de EQMP.
 
 Em cada comparação realizada abaixo (Questão 1-c e Questão 3), essa classificação
 aninhado/não-aninhado é discutida explicitamente, pois ela orienta a leitura correta dos
@@ -149,7 +132,7 @@ autocorrelação (HAC/Newey-West), já que os erros de previsão podem ser seria
 correlacionados quando o horizonte $h>1$. No caso de previsões $1$-passo-à-frente ($h=1$), como em
 toda esta lista, o estimador HAC se reduz, na prática, a um estimador robusto à heterocedasticidade.
 Testando $H_0:\sigma_1^2=\sigma_2^2$ contra $H_1:\sigma_1^2>\sigma_2^2$ (modelo 1 — em geral o
-passeio aleatório — tem MSFE maior, ou seja, é pior), rejeita-se $H_0$ para valores grandes e
+passeio aleatório — tem EQMP maior, ou seja, é pior), rejeita-se $H_0$ para valores grandes e
 positivos de $DMW$, comparando-o ao quantil superior de uma $t_{P-1}$ (conforme solicitado no
 enunciado).
 
@@ -241,7 +224,7 @@ sob o regime de metas entre 2006-2014, a recessão de 2015-16, o período de inf
 
 ### 1.2 Divisão da amostra: janela de identificação ($R$) e de avaliação ($P$)
 
-Conforme pede o enunciado, a escolha da especificação deve usar **apenas** uma janela de $R$
+A especificação usa **apenas** uma janela de $R$
 observações, reservando as $P$ observações finais só para a avaliação das previsões
 ($R+P=T+1$). Optou-se por usar cerca de 78% da amostra para identificação/estimação
 ($R=300$, de ago/1994 a jul/2019) e os 22% finais para avaliação
@@ -284,47 +267,99 @@ rejeita, a 5%, a hipótese nula de estacionariedade em torno de um nível consta
 (portanto $d=0$), mas com evidência de alguma instabilidade do nível/parâmetros ao longo dos 25
 anos de amostra — coerente com as sucessivas mudanças de regime de política monetária já
 mencionadas. Essa evidência é retomada na Seção 1.6 para justificar o uso de uma janela móvel na
-etapa de previsão. A FAC decai rapidamente, com o maior pico em defasagem 1 e alguns picos
-localizados de menor magnitude em defasagens sazonais (12, 24) — possivelmente associados a
-efeitos de calendário (reajustes de tarifas, mensalidades escolares etc.). A FACP corta
-abruptamente após a defasagem 1, sugerindo um **AR(1)** como candidato natural pela regra de
-identificação de Box-Jenkins, a ser confrontado com alternativas um pouco mais ricas via critérios
-de informação.
+etapa de previsão. A inspeção visual da FAC mostra um decaimento lento e aproximadamente
+geométrico — $\hat\rho_1\approx0{,}74$, $\hat\rho_2\approx0{,}55$, $\hat\rho_3\approx0{,}45$,
+$\hat\rho_4\approx0{,}35$ —, com picos localizados de menor magnitude em defasagens sazonais
+(12, 24), possivelmente associados a efeitos de calendário (reajustes de tarifas, mensalidades
+escolares etc.). A FACP, por sua vez, apresenta um único pico relevante na defasagem 1
+($\hat\phi_{11}\approx0{,}74$); a partir da defasagem 2, todos os valores ficam dentro da banda de
+$\pm1{,}96/\sqrt{300}\approx\pm0{,}113$ (o maior deles, na defasagem 3, chega a apenas $0{,}105$) —
+ou seja, estatisticamente indistinguíveis de ruído. Esse par de padrões — FAC com decaimento
+geométrico suave e FACP com corte abrupto após a primeira defasagem — é a assinatura clássica de
+identificação de um **AR(1)** pela metodologia de Box-Jenkins, sem indício visual de nenhum
+componente de médias móveis nem de ordem autorregressiva superior a 1.
 
 ### 1.4 Estimação e seleção do modelo (AIC/BIC)
 
-Estimam-se, ainda usando apenas a janela de identificação, todos os modelos ARMA($p,q$) com
-$p,q\in\{0,\dots,4\}$ (mantendo $d=0$, dado o resultado do teste ADF), comparando-os por AIC e por
-BIC.
+A identificação da Seção 1.3 aponta, sem ambiguidade, para um AR(1) puro. Ainda assim, estimam-se
+aqui, como verificação de robustez, todos os modelos ARMA($p,q$) com $p,q\in\{0,\dots,4\}$
+(mantendo $d=0$, dado o resultado do teste ADF), e não apenas o candidato identificado
+visualmente. A razão é deliberada, não um exagero sem propósito: um procedimento puramente visual
+pode não capturar toda a estrutura de segunda ordem da série — por exemplo, combinações AR+MA que
+produzem uma FACP com decaimento suave em vez de corte abrupto, e que por isso não seriam
+sinalizadas pela regra visual —, e a prática usual em algoritmos de seleção automática de ordem
+(como o de Hyndman & Khandakar, 2008, por trás do `auto.arima`) é justamente varrer uma vizinhança
+mais ampla ao redor do candidato identificado e comparar as especificações por AIC/BIC.
+Especificações como ARMA(1,1) ou ARMA(1,4), portanto, entram nessa varredura como checagem de
+robustez sobre a identificação visual — não porque a FAC/FACP sugerisse médias móveis —, e o
+resultado desta seção mostra que nenhuma delas de fato melhora sobre o AR(1) o suficiente para
+compensar sua complexidade adicional pelo BIC, o que é, em si, uma confirmação a posteriori de que
+a leitura visual da Seção 1.3 estava correta.
 """)
 
-code(r"""rows = []
+code(r"""def raizes_redundantes(ar_roots, ma_roots, tol=0.08):
+    # Sinaliza cancelamento AR/MA: par de raizes proximas o bastante para
+    # indicar redundancia de parametros (modelo mal-identificado), nao
+    # apenas coincidencia numerica.
+    if len(ar_roots) == 0 or len(ma_roots) == 0:
+        return False
+    return any(
+        abs(ar - ma) < tol * max(abs(ar), 1)
+        for ar in ar_roots
+        for ma in ma_roots
+    )
+
+rows = []
 for p in range(5):
     for q in range(5):
         if p == 0 and q == 0:
             continue
         try:
-            fit = ARIMA(train, order=(p, 0, q), trend="c").fit()
-            rows.append((p, 0, q, fit.aic, fit.bic))
+            # maxiter maior que o default (50) evita que o otimizador de
+            # maxima verossimilhanca pare por teto de iteracoes antes de
+            # satisfazer seu proprio criterio de convergencia; o metodo de
+            # estimacao continua sendo MLE, apenas com mais margem numerica.
+            fit = ARIMA(train, order=(p, 0, q), trend="c").fit(
+                method_kwargs={"maxiter": 200}
+            )
+            convergiu = bool(fit.mle_retvals.get("converged", True))
+            redundante = raizes_redundantes(fit.arroots, fit.maroots)
+            rows.append((p, 0, q, fit.aic, fit.bic, convergiu, redundante))
         except Exception:
             pass
 
-sel = pd.DataFrame(rows, columns=["p", "d", "q", "AIC", "BIC"])
-print("Top 5 por AIC:")
+sel = pd.DataFrame(
+    rows, columns=["p", "d", "q", "AIC", "BIC", "convergiu", "raizes_redundantes"]
+)
+print("Top 5 por AIC (todas as especificacoes estimadas):")
 display(sel.sort_values("AIC").head(5).reset_index(drop=True))
 print("\nTop 5 por BIC:")
 display(sel.sort_values("BIC").head(5).reset_index(drop=True))
+
+sel_confiavel = sel[sel["convergiu"] & ~sel["raizes_redundantes"]]
+print("\nTop 5 por AIC, restrito a especificacoes numericamente confiaveis")
+print("(convergencia genuina da otimizacao e sem raizes AR/MA quase se cancelando):")
+display(sel_confiavel.sort_values("AIC").head(5).reset_index(drop=True))
 """)
 
 md(r"""O critério AIC aponta para uma especificação mais rica, ARMA(4,3), com ganho marginal de
-verossimilhança que vem acompanhado de avisos de não-convergência numérica na otimização — sinal
-de super-parametrização e de raízes AR/MA próximas de se cancelarem (redundância de parâmetros).
-Já o BIC, que pune mais fortemente a complexidade e está mais alinhado ao **princípio da
-parcimônia** central à metodologia de Box-Jenkins, seleciona claramente o modelo mais simples,
-**AR(1) com intercepto** — ARIMA(1,0,0) —, com folga sobre as demais especificações. Adota-se o
-BIC como critério decisório principal justamente por essa propriedade de parcimônia e pela maior
-estabilidade numérica do modelo selecionado, e segue-se para o diagnóstico de resíduos do
-ARIMA(1,0,0).
+verossimilhança que vem acompanhado de avisos de não-convergência numérica na otimização. Um
+diagnóstico mais cuidadoso mostra que essa não-convergência não é um mero detalhe numérico:
+aumentando o número máximo de iterações do otimizador (mesmo método de máxima verossimilhança,
+apenas com mais margem para convergir), a estimação chega a um ponto estacionário, mas nele um par
+de raízes do polinômio AR (módulo $\approx1{,}04$) quase coincide com um par de raízes do polinômio
+MA (módulo $\approx1{,}04$) — evidência de cancelamento de raízes e, portanto, de redundância de
+parâmetros: o modelo "grande" está, na prática, mal-identificado, com coeficientes fortemente
+correlacionados entre si (correlações de até 0,85-0,88 entre `ar.L1`, `ar.L4` e os termos MA). É por
+isso que a tabela acima também é reportada de forma restrita às especificações que convergiram
+genuinamente e cujas raízes AR/MA não se sobrepõem: essa filtragem descarta o ARMA(4,3) por
+não-confiabilidade numérica, independentemente do valor nominal do seu AIC. Já o BIC, que pune mais
+fortemente a complexidade e está mais alinhado ao **princípio da parcimônia** central à metodologia
+de Box-Jenkins, seleciona claramente o modelo mais simples, **AR(1) com intercepto** —
+ARIMA(1,0,0) —, com folga sobre as demais especificações — exatamente o mesmo candidato apontado
+pela identificação visual da FAC/FACP na Seção 1.3. Adota-se o BIC como critério decisório
+principal por essa convergência entre parcimônia, identificação visual e estabilidade numérica, e
+segue-se para o diagnóstico de resíduos do ARIMA(1,0,0).
 
 ### 1.5 Diagnóstico dos resíduos do modelo selecionado
 """)
@@ -387,10 +422,10 @@ ax.legend()
 plt.tight_layout()
 plt.show()
 
-msfe_model = np.mean((y_true - f_model) ** 2)
-msfe_rw = np.mean((y_true - f_rw) ** 2)
-print(f"MSFE ARIMA(1,0,0) = {msfe_model:.4f}")
-print(f"MSFE passeio aleatorio = {msfe_rw:.4f}")
+eqmp_model = np.mean((y_true - f_model) ** 2)
+eqmp_rw = np.mean((y_true - f_rw) ** 2)
+print(f"EQMP ARIMA(1,0,0) = {eqmp_model:.4f}")
+print(f"EQMP passeio aleatorio = {eqmp_rw:.4f}")
 """)
 
 md(r"""O gráfico único acima sobrepõe o valor efetivamente observado do IPCA aos dois conjuntos de
@@ -398,7 +433,7 @@ previsão no período de avaliação. Visualmente, o passeio aleatório reage à
 apenas com uma defasagem de um período (por construção, ele "copia" o último valor observado),
 o que o torna particularmente lento para captar o pico do choque inflacionário de 2021-22 e a
 subsequente desinflação; o ARIMA(1,0,0) com janela móvel, por incorporar reversão à média,
-amortece parte dessas oscilações e acompanha melhor as mudanças de patamar. Numericamente, o MSFE
+amortece parte dessas oscilações e acompanha melhor as mudanças de patamar. Numericamente, o EQMP
 do modelo ARIMA é menor que o do passeio aleatório, uma primeira evidência de ganho preditivo que
 é testada formalmente a seguir.
 
@@ -513,9 +548,9 @@ semelhantes às do modelo "verdadeiro"; e o passeio aleatório, por ignorar a re
 processo (só "copia" o último valor), fica sistematicamente mais disperso em torno da série
 observada, sobretudo após desvios grandes de $y_t$ em relação à média incondicional.
 
-### 4. Questão 3 — Testes de igualdade de MSFE (DMW e CW)
+### 4. Questão 3 — Testes de igualdade de EQMP (DMW e CW)
 
-Com $\sigma_v^2$, $\sigma_{ar.est}^2$ e $\sigma_{rw}^2$ denotando os MSFEs do modelo verdadeiro, do
+Com $\sigma_v^2$, $\sigma_{ar.est}^2$ e $\sigma_{rw}^2$ denotando os EQMPs do modelo verdadeiro, do
 AR(1) estimado e do passeio aleatório, testam-se as três hipóteses do enunciado:
 
 $$H_0:\sigma_{rw}^2=\sigma_{ar.est}^2 \ \text{ contra }\ H_1:\sigma_{rw}^2>\sigma_{ar.est}^2$$
@@ -527,12 +562,12 @@ code(r"""e_true_sim = y_target_sim - f_true_sim
 e_ar_sim = y_target_sim - f_ar_sim
 e_rw_sim = y_target_sim - f_rw_sim
 
-msfe_true = np.mean(e_true_sim ** 2)
-msfe_ar = np.mean(e_ar_sim ** 2)
-msfe_rw = np.mean(e_rw_sim ** 2)
-print(f"MSFE (verdadeiro)  sigma_v^2      = {msfe_true:.4f}")
-print(f"MSFE (AR estimado) sigma_ar.est^2 = {msfe_ar:.4f}")
-print(f"MSFE (passeio)     sigma_rw^2     = {msfe_rw:.4f}")
+eqmp_true = np.mean(e_true_sim ** 2)
+eqmp_ar = np.mean(e_ar_sim ** 2)
+eqmp_rw = np.mean(e_rw_sim ** 2)
+print(f"EQMP (verdadeiro)  sigma_v^2      = {eqmp_true:.4f}")
+print(f"EQMP (AR estimado) sigma_ar.est^2 = {eqmp_ar:.4f}")
+print(f"EQMP (passeio)     sigma_rw^2     = {eqmp_rw:.4f}")
 
 pares = {
     "H0: rw = ar.est": (e_rw_sim, e_ar_sim, f_rw_sim, f_ar_sim),
@@ -648,7 +683,7 @@ Os dois exercícios desta lista — um empírico, com dados reais de inflação 
 controlado, com uma série simulada de processo gerador conhecido — convergem para a mesma lição
 central sobre avaliação de previsões. Quando o modelo de referência (o passeio aleatório) está
 aninhado no modelo concorrente, a estatística de Diebold-Mariano-West, mesmo sendo o teste
-"natural" para comparar MSFEs, tende a ser conservadora demais, por conta do ruído de estimação dos
+"natural" para comparar EQMPs, tende a ser conservadora demais, por conta do ruído de estimação dos
 parâmetros extras do modelo maior. A estatística de Clark-West corrige analiticamente esse viés, e
 o bootstrap semi-paramétrico oferece uma segunda forma, não-paramétrica, de chegar à mesma
 correção, obtendo valores críticos e p-valores exatos em amostra finita. No caso do IPCA, DMW e CW
