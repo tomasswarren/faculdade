@@ -269,13 +269,18 @@ anos de amostra — coerente com as sucessivas mudanças de regime de política 
 mencionadas. Essa evidência é retomada na Seção 1.6 para justificar o uso de uma janela móvel na
 etapa de previsão. A inspeção visual da FAC mostra um decaimento lento e aproximadamente
 geométrico — $\hat\rho_1\approx0{,}74$, $\hat\rho_2\approx0{,}55$, $\hat\rho_3\approx0{,}45$,
-$\hat\rho_4\approx0{,}35$ —, com picos localizados de menor magnitude em defasagens sazonais
-(12, 24), possivelmente associados a efeitos de calendário (reajustes de tarifas, mensalidades
-escolares etc.). A FACP, por sua vez, apresenta um único pico relevante na defasagem 1
-($\hat\phi_{11}\approx0{,}74$); a partir da defasagem 2, todos os valores ficam dentro da banda de
-$\pm1{,}96/\sqrt{300}\approx\pm0{,}113$ (o maior deles, na defasagem 3, chega a apenas $0{,}105$) —
-ou seja, estatisticamente indistinguíveis de ruído. Esse par de padrões — FAC com decaimento
-geométrico suave e FACP com corte abrupto após a primeira defasagem — é a assinatura clássica de
+$\hat\rho_4\approx0{,}35$ —, sem nenhum reforço destacado em defasagens sazonais (12, 24): o valor
+na defasagem 12 ($\hat\rho_{12}\approx0{,}25$) é apenas um pequeno solavanco dentro da tendência de
+queda já em curso, e na defasagem 24 ($\hat\rho_{24}\approx0{,}01$) a FAC já está achatada,
+indistinguível do ruído ao redor — não há, portanto, evidência clara de um componente sazonal na
+FAC. A FACP, por sua vez, apresenta um único pico relevante na defasagem 1
+($\hat\phi_{11}\approx0{,}74$); a partir da defasagem 2, os valores oscilam em torno de zero muito
+próximos da banda de $\pm1{,}96/\sqrt{300}\approx\pm0{,}113$ — o maior deles, na defasagem 8,
+chega a $0{,}115$, ultrapassando-a por uma margem desprezível —, o que é o resultado esperado ao
+examinar 24 defasagens simultaneamente (a taxa de falso-positivo nominal de 5% já antecipa, em
+média, cerca de uma violação isolada da banda a cada 20 defasagens testadas) e não caracteriza
+nenhuma estrutura autorregressiva adicional. Esse par de padrões — FAC com decaimento geométrico
+suave e FACP com corte abrupto após a primeira defasagem — é a assinatura clássica de
 identificação de um **AR(1)** pela metodologia de Box-Jenkins, sem indício visual de nenhum
 componente de médias móveis nem de ordem autorregressiva superior a 1.
 
@@ -540,13 +545,21 @@ plt.tight_layout()
 plt.show()
 """)
 
-md(r"""O gráfico único evidencia o padrão esperado: a previsão com coeficientes verdadeiros
-acompanha de perto a trajetória observada (é a melhor previsão possível, dado que usa o processo
-gerador de dados exato); o AR(1) estimado recursivamente já converge, com $R=50$ observações
-iniciais, para coeficientes bastante próximos dos verdadeiros, produzindo previsões muito
-semelhantes às do modelo "verdadeiro"; e o passeio aleatório, por ignorar a reversão à média do
-processo (só "copia" o último valor), fica sistematicamente mais disperso em torno da série
-observada, sobretudo após desvios grandes de $y_t$ em relação à média incondicional.
+md(r"""O gráfico único evidencia o padrão esperado: a previsão com coeficientes verdadeiros captura
+corretamente a componente previsível da série — a reversão à média condicional —, mas, como
+esperado de uma previsão ótima sob inovações de variância alta e cauda pesada ($t(5)$), não
+acompanha de perto os desvios extremos da série observada nos instantes de choque (por exemplo,
+em torno de $t\approx80$-$82$ e $t=100$): esses desvios são, por construção, a parte não-previsível
+do processo, e nenhuma previsão $1$-passo-à-frente — nem mesmo a que usa os coeficientes
+populacionais — poderia capturá-los; é "a melhor previsão possível" no sentido de minimizar o erro
+quadrático médio, não no sentido de seguir de perto cada oscilação de $y_t$. O AR(1) estimado
+recursivamente já converge, com $R=50$ observações iniciais, para coeficientes bastante próximos
+dos verdadeiros, produzindo previsões muito semelhantes às do modelo "verdadeiro" — inclusive
+durante os choques, as curvas verde e vermelha permanecem praticamente sobrepostas. Já o passeio
+aleatório, por ignorar a reversão à média do processo (só "copia" o último valor, sem amortecê-lo),
+reproduz cada choque observado com um período de atraso e sem nenhuma atenuação, ficando
+sistematicamente mais disperso em torno da série observada, sobretudo após desvios grandes de
+$y_t$ em relação à média incondicional.
 
 ### 4. Questão 3 — Testes de igualdade de EQMP (DMW e CW)
 
@@ -656,10 +669,17 @@ estatística CW observada (≈2,18) é de aproximadamente 0,008, também menor q
 correspondente (≈0,02).
 
 iii) **Distribuição da estatística de teste.** Os histogramas acima mostram que a distribuição
-bootstrap de ambas as estatísticas sob $H_0$ é deslocada para a esquerda e possui menor dispersão
-do que a $t_{49}$ assintótica usada como referência convencional — precisamente o padrão descrito
-na Seção 0.2 para comparações aninhadas, em que a aproximação assintótica convencional tende a ser
-excessivamente conservadora.
+bootstrap de ambas as estatísticas sob $H_0$ é deslocada para a esquerda em relação à $t_{49}$
+assintótica usada como referência convencional (média $\approx-0{,}75$ para a DMW e
+$\approx-0{,}07$ para a CW, contra média 0 da referência) — precisamente o padrão descrito na
+Seção 0.2 para comparações aninhadas, em que o ruído de estimação dos parâmetros extras do modelo
+maior enviesa a estatística para baixo sob $H_0$. Vale notar que esse deslocamento é puramente de
+**localização**, não de dispersão: o desvio-padrão da distribuição bootstrap
+($\approx1{,}02$ para ambas as estatísticas) é praticamente idêntico ao da $t_{49}$ de referência
+($\approx1{,}02$). São os valores críticos deslocados para a esquerda — e não uma distribuição
+mais concentrada — que produzem os p-valores bootstrap menores do item (ii); a aproximação
+assintótica convencional erra no centro da distribuição sob $H_0$ nesse cenário aninhado, não na
+sua largura.
 
 iv) **Conclusão sobre $H_0$.** Usando os valores críticos exatos (bootstrap) em vez dos
 convencionais, rejeita-se $H_0:\sigma_{rw}^2=\sigma_{ar}^2$ a 5% (e mesmo a 1%, no caso da CW) —
