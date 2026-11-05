@@ -42,26 +42,28 @@ def load(s):
 
 
 raw_all = pd.concat({s: load(s) for s in FRED}, axis=1).loc["1989-12-01":END_FULL].dropna()
-lab = {"dlppi": "Commodities (Δln PPI)", "dlip": "Produção ind. (Δln)", "dlcpi": "CPI (Δln)",
+lab = {"lppi": "Commodities (ln PPI)", "lip": "Produção ind. (ln)", "lcpi": "CPI (ln)",
        "ur": "Desemprego", "ffr": "Fed Funds"}
 short = {k: v.split(" (")[0] for k, v in lab.items()}
-DIFF = ("dlppi", "dlip", "dlcpi")
-ORDER = ["dlip", "dlcpi", "dlppi", "ur", "ffr"]          # ordem de Christiano-Eichenbaum-Evans (1999)
-ORDER_ALT = ["dlppi", "dlip", "dlcpi", "ur", "ffr"]      # ordem alternativa (commodities primeiro)
+DIFF = ()                                                # todas as variaveis em nivel (ln x 100, desemprego e juro em %)
+ORDER = ["lip", "lcpi", "lppi", "ur", "ffr"]          # ordem de Christiano-Eichenbaum-Evans (1999)
+ORDER_ALT = ["lppi", "lip", "lcpi", "ur", "ffr"]      # ordem alternativa (commodities primeiro)
 
 
 def deseason(s):
-    """Remove a componente sazonal deterministica (medias mensais) de uma serie; preserva a media geral."""
+    """Remove a componente sazonal deterministica (dummies mensais, controlando por tendencia linear) de uma serie em nivel."""
     D = pd.get_dummies(s.index.month).astype(float).set_index(s.index)
-    r = sm.OLS(s, D).fit()
-    return s - r.fittedvalues + s.mean()
+    X = D.copy(); X["trend"] = np.arange(len(s)) / 12.0
+    r = sm.OLS(s, X).fit()
+    return s - D @ r.params[D.columns] + (D @ r.params[D.columns]).mean()
 
 
 def transform(raw):
-    t = pd.DataFrame({"dlppi": 100 * np.log(raw.PPIACO).diff(), "dlip": 100 * np.log(raw.INDPRO).diff(),
-                      "dlcpi": 100 * np.log(raw.CPIAUCSL).diff(), "ur": raw.UNRATE, "ffr": raw.FEDFUNDS}).dropna()
-    t["dlppi"] = deseason(t["dlppi"])                      # PPIACO nao e dessazonalizada no FRED
-    return t
+    """Todas as variaveis em nivel: 100*ln para PPI, producao e CPI; desemprego e Fed Funds em %."""
+    t = pd.DataFrame({"lppi": 100 * np.log(raw.PPIACO), "lip": 100 * np.log(raw.INDPRO),
+                      "lcpi": 100 * np.log(raw.CPIAUCSL), "ur": raw.UNRATE, "ffr": raw.FEDFUNDS}).dropna()
+    t["lppi"] = deseason(t["lppi"])                        # PPIACO nao e dessazonalizada no FRED
+    return t.loc["1990-01-01":]
 
 
 d_full = transform(raw_all)
@@ -96,32 +98,28 @@ ax.flat[-1].text(0, .6, "Faixas cinza: recessões do NBER.\nLinha tracejada: fim
 fig.tight_layout(); fig.savefig(f"{HERE}/img/series_originais.png"); plt.close(fig)
 
 fig, ax = plt.subplots(1, 3, figsize=(12, 3))
-for a, c in zip(ax, DIFF):
-    a.plot(d_main[c], color=C1, lw=1); a.axhline(0, color="k", lw=.5); a.set_title(lab[c]); shade(a)
+for a, c in zip(ax, ["lppi", "lip", "lcpi"]):
+    a.plot(d_main[c], color=C1, lw=1); a.set_title(lab[c] + " × 100" + (", dessazonalizado" if c == "lppi" else "")); shade(a)
 fig.tight_layout(); fig.savefig(f"{HERE}/img/series_transformadas.png"); plt.close(fig)
 
-# correlacoes cruzadas: corr(ffr_t, x_{t+k})
+# correlacoes cruzadas (descritivas, nas primeiras diferencas: os niveis sao tendenciais): corr(dffr_t, dx_{t+k})
+diffs = d.diff().dropna()
 ks = np.arange(-24, 25)
 fig, ax = plt.subplots(1, 4, figsize=(13, 2.8), sharey=True)
 for a, c in zip(ax, [n for n in ORDER if n != "ffr"]):
-    cc = [d["ffr"].corr(d[c].shift(-k)) for k in ks]
+    cc = [diffs["ffr"].corr(diffs[c].shift(-k)) for k in ks]
     a.bar(ks, cc, color=C1, width=.8); a.axhline(0, color="k", lw=.6)
-    a.axhline(1.96 / np.sqrt(len(d)), color=C2, lw=.8, ls=":"); a.axhline(-1.96 / np.sqrt(len(d)), color=C2, lw=.8, ls=":")
-    a.set_title(f"corr(Fed Funds$_t$, {short[c]}$_{{t+k}}$)", fontsize=9); a.set_xlabel("k (meses)")
+    a.axhline(1.96 / np.sqrt(len(diffs)), color=C2, lw=.8, ls=":"); a.axhline(-1.96 / np.sqrt(len(diffs)), color=C2, lw=.8, ls=":")
+    a.set_title(f"corr(ΔFed Funds$_t$, Δ{short[c]}$_{{t+k}}$)", fontsize=9); a.set_xlabel("k (meses)")
 fig.tight_layout(); fig.savefig(f"{HERE}/img/correlacao_cruzada.png"); plt.close(fig)
 
 # ------------------------------------------------------------------ raiz unitaria (especificacao reportada)
 ur = {}
 for c in ORDER:
-    a = adfuller(d[c], regression="c", autolag="AIC"); k = kpss(d[c], regression="c", nlags="auto")
-    ur[c] = {"adf_p": float(a[1]), "adf_lags": int(a[2]), "kpss_p": float(k[1]), "kpss_stat": float(k[0]), "spec": "c"}
-lvl_main = {"dlppi": 100 * np.log(raw.PPIACO), "dlip": 100 * np.log(raw.INDPRO), "dlcpi": 100 * np.log(raw.CPIAUCSL)}
-ur_lvl = {}
-for c, s in lvl_main.items():
-    s = s.loc[d.index]
-    a = adfuller(s, regression="ct", autolag="AIC"); k = kpss(s, regression="ct", nlags="auto")
-    ur_lvl[c] = {"adf_p": float(a[1]), "adf_lags": int(a[2]), "kpss_p": float(k[1])}
-out["unit_root"], out["unit_root_levels"] = ur, ur_lvl
+    reg = "c" if c in ("ur", "ffr") else "ct"            # series com tendencia: constante e tendencia; limitadas: constante
+    a = adfuller(d[c], regression=reg, autolag="AIC"); k = kpss(d[c], regression=reg, nlags="auto")
+    ur[c] = {"adf_p": float(a[1]), "adf_lags": int(a[2]), "kpss_p": float(k[1]), "kpss_stat": float(k[0]), "spec": reg}
+out["unit_root"] = ur
 
 # ------------------------------------------------------------------ nucleo do VAR (MQO com dummies sazonais)
 
@@ -257,13 +255,12 @@ out["lb"] = {c: {"p12": float(acorr_ljungbox(res.resid[c], lags=[12], return_df=
 out["portmanteau_p"] = float(res.test_whiteness(nlags=24, adjusted=True).pvalue)
 out["normality_p"] = float(res.test_normality().pvalue)
 # sem dessazonalizar a PPI (para mostrar o efeito da sazonalidade)
-d_ns = pd.DataFrame({"dlip": 100 * np.log(raw.INDPRO).diff(), "dlcpi": 100 * np.log(raw.CPIAUCSL).diff(),
-                     "dlppi": 100 * np.log(raw.PPIACO).diff(), "ur": raw.UNRATE, "ffr": raw.FEDFUNDS}).dropna()
+d_ns = pd.DataFrame({"lip": 100 * np.log(raw.INDPRO), "lcpi": 100 * np.log(raw.CPIAUCSL),
+                     "lppi": 100 * np.log(raw.PPIACO), "ur": raw.UNRATE, "ffr": raw.FEDFUNDS}).dropna()
 res_nd = VAR(d_ns).fit(P_LAGS)
 out["portmanteau_p_sem_dessaz"] = float(res_nd.test_whiteness(nlags=24, adjusted=True).pvalue)
-out["lb_ppi_sem_dessaz"] = float(acorr_ljungbox(res_nd.resid["dlppi"], lags=[12], return_df=True).lb_pvalue.iloc[0])
-out["ppi_sazonal_amp"] = float(d_ns["dlppi"].groupby(d_ns.index.month).mean().max() - d_ns["dlppi"].groupby(d_ns.index.month).mean().min())
-out["cpi_acf"] = {str(k): float(res.resid["dlcpi"].autocorr(k)) for k in (1, 2, 11, 12, 13)}
+out["lb_ppi_sem_dessaz"] = float(acorr_ljungbox(res_nd.resid["lppi"], lags=[12], return_df=True).lb_pvalue.iloc[0])
+out["cpi_acf"] = {str(k): float(res.resid["lcpi"].autocorr(k)) for k in (1, 2, 11, 12, 13)}
 out["n_eff"] = int(res.nobs)
 
 fig, ax = plt.subplots(5, 1, figsize=(8.5, 10))
@@ -292,7 +289,7 @@ out.update({"max_root": V["maxroot"], "max_root_ols": V["maxroot_ols"], "bias_de
 ev = np.linalg.eigvals(companion(V["Ac"]))
 fig, a = plt.subplots(figsize=(4.6, 4.6))
 a.add_patch(plt.Circle((0, 0), 1, fill=False, color="k", lw=1)); a.scatter(ev.real, ev.imag, color=C1, s=22)
-a.set_aspect("equal"); a.set_xlim(-1.1, 1.1); a.set_ylim(-1.1, 1.1); a.set_title("Autovalores da matriz companheira (30)")
+a.set_aspect("equal"); a.set_xlim(-1.1, 1.1); a.set_ylim(-1.1, 1.1); a.set_title("Autovalores da matriz companheira (20)")
 fig.tight_layout(); fig.savefig(f"{HERE}/img/raizes.png"); plt.close(fig)
 
 # ---- 7.a FRI 5x5 (choque de 1 desvio-padrao; escala comum por linha)
@@ -308,7 +305,7 @@ for i in range(5):
         if i == 0: a.set_title(f"Choque: {short[names[j]]}", fontsize=10, color=C2 if names[j] == "ffr" else "k")
         if j == 0: a.set_ylabel(short[names[i]] + ("\n(acum.)" if i in V["cum_idx"] else ""), fontsize=10)
 for a in ax[-1]: a.set_xlabel("meses")
-fig.suptitle("FRI ortogonalizada (Cholesky): choque de 1 desvio-padrão; IC 90% (wild bootstrap, vies corrigido)", y=.998)
+fig.suptitle("FRI ortogonalizada (Cholesky), variáveis em nível: choque de 1 desvio-padrão; IC 90% (wild bootstrap)", y=.998)
 fig.tight_layout(); fig.savefig(f"{HERE}/img/fri_completa.png"); plt.close(fig)
 
 out["irf_matrix"] = {names[i]: {names[j]: {str(h): [float(V["point"][h, i, j]), float(LO[h, i, j]), float(HI[h, i, j])] for h in (0, 12, 24, 48)}
@@ -318,10 +315,8 @@ pt_mp, lo_mp, hi_mp = unit_resp(V, "ffr")
 fig, ax = plt.subplots(1, 5, figsize=(16, 3.2))
 for i in range(5):
     a = ax[i]; a.fill_between(hh, lo_mp[:, i], hi_mp[:, i], color=C1, alpha=.2, lw=0)
-    a.plot(hh, pt_mp[:, i], color=C1, lw=1.6, label="correção de viés"); a.axhline(0, color="k", lw=.6)
-    a.plot(hh, V["point_ols"][:, i, 4] / V["dP"][4], color=C3, lw=1.1, ls="--", label="MQO")
+    a.plot(hh, pt_mp[:, i], color=C1, lw=1.6); a.axhline(0, color="k", lw=.6)
     a.set_title(short[names[i]] + (" – acum." if i in V["cum_idx"] else "")); a.set_xlabel("meses")
-ax[0].legend(frameon=False, fontsize=8)
 fig.suptitle("Resposta a um choque monetário de +100 pb (1 p.p.) no Fed Funds; IC 90%", y=1.04)
 fig.tight_layout(); fig.savefig(f"{HERE}/img/fri_choque_monetario.png", bbox_inches="tight"); plt.close(fig)
 HS = (0, 6, 12, 24, 48)
@@ -363,7 +358,7 @@ out["fevd_alt"] = {str(hy): {V_alt["names"][i]: {V_alt["names"][j]: float(fe_alt
                    for hy in fe_alt}
 Pm = np.linalg.cholesky(V["f0"]["Sigma"]); sqm = (phi(V["Ac"], H_IRF) @ Pm) ** 2
 fig, ax = plt.subplots(1, 5, figsize=(16, 3.2), sharey=True)
-cols = {"dlip": "#27ae60", "dlcpi": "#e67e22", "dlppi": "#8e44ad", "ur": "#7f8c8d", "ffr": C2}
+cols = {"lip": "#27ae60", "lcpi": "#e67e22", "lppi": "#8e44ad", "ur": "#7f8c8d", "ffr": C2}
 for i in range(5):
     cs = np.cumsum(sqm[:H_IRF, i, :], axis=0); sh = 100 * cs / cs.sum(1, keepdims=True)
     ax[i].stackplot(np.arange(1, H_IRF + 1), sh.T, colors=[cols[n] for n in names], labels=[short[n] for n in names], alpha=.85)
